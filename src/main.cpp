@@ -247,40 +247,45 @@ int main() {
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     
-    line.ft = {
-        0, 1,
-        1, 2
-    };
+    int pointsCount = 20;
+    int linesCount = 10;
     
-    line.pos.reserve(line.ft.size() * 3);
+    for (int i = 0; i < linesCount; i++) {
+        line.ft.push_back(rand() % pointsCount);
+        line.ft.push_back(rand() % pointsCount);
+    }
+    
+    //line.pos.reserve(line.ft.size() * 3);
     for (uint i=0; i < line.ft.size() * 3; i++) line.pos.push_back(0);
     //std::cout << "line.pos.size:" << line.pos.size() << std::endl;
     
-    point.pos = {
-        0.1, 0.1, 0,
-        0.2, 0.2, 0,
-        0.8, 0.8, 0
-    };
+    srand(time(NULL));
     
-    point.vel = {
-        0.01, 0.01, 0,
-        0.01, 0.02, 0,
-        -0.005, -0.025, 0,
-    };
+    for (int i = 0; i < pointsCount; i++) {
+        float a[3] = { (float)rand() / (float)RAND_MAX, (float)rand() / (float)RAND_MAX, 0 };
+        point.pos.insert(point.pos.end(), a, a + 3);
+        
+        float b[3] = { (float)rand() / (float)RAND_MAX / 100.0, (float)rand() / (float)RAND_MAX / 100.0, 0 };
+        point.vel.insert(point.vel.end(), b, b + 3);
+    }
     
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid *)0);
     
+    int fpsCounter = 0;
+    clock_t current_ticks, delta_ticks, fps = 0;
     while (!glfwWindowShouldClose(window)) {
+        current_ticks = clock();
         //std::cout << pos.size() << std::endl;
         
         for (uint i = 0; i < point.pos.size(); i++) {
             point.pos[i] += point.vel[i];
+            if (point.pos[i] < -1 || point.pos[i] > 1) point.vel[i] *= -1;
         }
         
         for (uint i = 0; i < line.ft.size(); i++) {
             line.pos[i * 3    ] = point.pos[line.ft[i] * 3];
             line.pos[i * 3 + 1] = point.pos[line.ft[i] * 3 + 1];
-            line.pos[i * 3 + 2] = point.pos[line.ft[i] * 3 + 2];
+            //line.pos[i * 3 + 2] = point.pos[line.ft[i] * 3 + 2];
         }
         
         glfwPollEvents();
@@ -303,6 +308,19 @@ int main() {
         
         // Swap the screen buffers
         glfwSwapBuffers(window);
+        
+        // FPS
+        delta_ticks = clock() - current_ticks;
+        if (delta_ticks > 0) {
+            fps = CLOCKS_PER_SEC / delta_ticks;
+        }
+        
+        if (fpsCounter % 100 == 0) {
+            std::cout << "fps: " << fps << std::endl;
+        }
+        
+        fpsCounter++;
+        if (fpsCounter > 1000000) fpsCounter = 0;
     }
 
     // Properly de-allocate all resources once they've outlived their purpose
