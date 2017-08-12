@@ -1,10 +1,16 @@
-#define GLEW_STATIC
+// #define GLEW_STATIC
 #include <stdio.h>
 #include <vector>
 #include <iostream>
 #include <glew.h>
 #include <GLFW/glfw3.h>
 
+/*
+План
+ - двигать шарики
+ - линии привязаны к шарикам
+ - двигать шарики через cuda
+ */
 
 // Function prototypes
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
@@ -15,8 +21,9 @@ const GLuint WIDTH = 800, HEIGHT = 600;
 GLFWwindow* window;
 GLuint lineShaderProgram;
 GLuint pointShaderProgram;
-//GLfloat pointVertex;
-std::vector<float> vert;
+
+std::vector<float> pos;
+std::vector<float> vel;
 
 // Is called whenever a key is pressed/released via GLFW
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode) {
@@ -24,9 +31,9 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GL_TRUE);
     }
-    vert.push_back(0.4);
-    vert.push_back(0.4);
-    vert.push_back(0);
+    pos.push_back(0.4);
+    pos.push_back(0.4);
+    pos.push_back(0);
 }
 
 int init() {
@@ -40,7 +47,7 @@ int init() {
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
     // Create a GLFWwindow object that we can use for GLFW's functions
-    window = glfwCreateWindow(WIDTH, HEIGHT, "LearnOpenGL", nullptr, nullptr);    
+    window = glfwCreateWindow(WIDTH, HEIGHT, "LearnOpenGL", nullptr, nullptr);
     if (window == nullptr) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -141,7 +148,7 @@ GLuint getPointShaderProgram() {
         "  vec2 pos = gl_PointCoord.xy * vec2(2.0, -2.0) + vec2(-1.0, 1.0);\n"
         "  float mag = dot(pos, pos);\n"
           "if (mag > 1.0) discard;\n"
-          "gl_FragColor = vec4(.90, .90, .90, 1.0);\n"
+          "gl_FragColor = vec4(1.0, .0, .0, 1.0);\n"
         "}\n\0";
     
     // Build and compile our shader program
@@ -204,7 +211,7 @@ void drawPoints() {
     glUseProgram(pointShaderProgram);
     glPointSize(10.0);
     //glVertexPointer(2, GL_FLOAT, 0, pointVertex);
-    glDrawArrays(GL_POINTS, 0, vert.size());
+    glDrawArrays(GL_POINTS, 0, pos.size() / 3);
 }
 
 
@@ -236,16 +243,27 @@ int main() {
         -0.2, 0.5, 0
     };
     
-    vert = {
+    pos = {
         0.1, 0.1, 0,
         0.2, 0.2, 0,
-        0.3, 0.3, 0
+        0.8, 0.8, 0
     };
     
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    vel = {
+        0.01, 0.01, 0,
+        0.01, 0.02, 0,
+        -0.005, -0.025, 0,
+    };
+    
+    
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid *)0);
     
     while (!glfwWindowShouldClose(window)) {
-        //std::cout << vert.size() << std::endl;
+        //std::cout << pos.size() << std::endl;
+        
+        for (int i = 0; i < pos.size(); i++) {
+            pos[i] += vel[i];
+        }
         
         glfwPollEvents();
         
@@ -258,7 +276,8 @@ int main() {
         glBufferData(GL_ARRAY_BUFFER, sizeof(lineVertices), lineVertices, GL_STATIC_DRAW);
         drawLines();
         
-        glBufferData(GL_ARRAY_BUFFER, vert.size() * sizeof(float), vert.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, pos.size() * sizeof(float), pos.data(), GL_DYNAMIC_DRAW);
+        
         drawPoints();
         
         glDisableClientState(GL_VERTEX_ARRAY);
