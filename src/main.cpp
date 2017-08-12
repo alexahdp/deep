@@ -22,8 +22,17 @@ GLFWwindow* window;
 GLuint lineShaderProgram;
 GLuint pointShaderProgram;
 
-std::vector<float> pos;
-std::vector<float> vel;
+struct Point {
+    std::vector<float> pos;
+    std::vector<float> vel;
+} typedef Point;
+Point point;
+
+struct Line {
+    std::vector<int> ft;
+    std::vector<float> pos;
+} typedef Line;
+Line line;
 
 // Is called whenever a key is pressed/released via GLFW
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode) {
@@ -31,9 +40,9 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GL_TRUE);
     }
-    pos.push_back(0.4);
-    pos.push_back(0.4);
-    pos.push_back(0);
+    point.pos.push_back(0.4);
+    point.pos.push_back(0.4);
+    point.pos.push_back(0);
 }
 
 int init() {
@@ -202,7 +211,7 @@ void drawLines() {
     glUseProgram(lineShaderProgram);
     
     glLineWidth(2.0);
-    glDrawArrays(GL_LINES, 0, 2);
+    glDrawArrays(GL_LINES, 0, line.pos.size() / 3);
     
     glDisable(GL_LINE_SMOOTH);
 }
@@ -211,7 +220,7 @@ void drawPoints() {
     glUseProgram(pointShaderProgram);
     glPointSize(10.0);
     //glVertexPointer(2, GL_FLOAT, 0, pointVertex);
-    glDrawArrays(GL_POINTS, 0, pos.size() / 3);
+    glDrawArrays(GL_POINTS, 0, point.pos.size() / 3);
 }
 
 
@@ -238,31 +247,40 @@ int main() {
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     
-    GLfloat lineVertices[] = {
-        -0.2, 0, 0,
-        -0.2, 0.5, 0
+    line.ft = {
+        0, 1,
+        1, 2
     };
     
-    pos = {
+    line.pos.reserve(line.ft.size() * 3);
+    for (uint i=0; i < line.ft.size() * 3; i++) line.pos.push_back(0);
+    //std::cout << "line.pos.size:" << line.pos.size() << std::endl;
+    
+    point.pos = {
         0.1, 0.1, 0,
         0.2, 0.2, 0,
         0.8, 0.8, 0
     };
     
-    vel = {
+    point.vel = {
         0.01, 0.01, 0,
         0.01, 0.02, 0,
         -0.005, -0.025, 0,
     };
-    
     
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid *)0);
     
     while (!glfwWindowShouldClose(window)) {
         //std::cout << pos.size() << std::endl;
         
-        for (int i = 0; i < pos.size(); i++) {
-            pos[i] += vel[i];
+        for (uint i = 0; i < point.pos.size(); i++) {
+            point.pos[i] += point.vel[i];
+        }
+        
+        for (uint i = 0; i < line.ft.size(); i++) {
+            line.pos[i * 3    ] = point.pos[line.ft[i] * 3];
+            line.pos[i * 3 + 1] = point.pos[line.ft[i] * 3 + 1];
+            line.pos[i * 3 + 2] = point.pos[line.ft[i] * 3 + 2];
         }
         
         glfwPollEvents();
@@ -273,10 +291,10 @@ int main() {
         glEnableClientState(GL_VERTEX_ARRAY);
         glEnableVertexAttribArray(0);
         
-        glBufferData(GL_ARRAY_BUFFER, sizeof(lineVertices), lineVertices, GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, line.pos.size() * sizeof(float), line.pos.data(), GL_DYNAMIC_DRAW);
         drawLines();
         
-        glBufferData(GL_ARRAY_BUFFER, pos.size() * sizeof(float), pos.data(), GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, point.pos.size() * sizeof(float), point.pos.data(), GL_DYNAMIC_DRAW);
         
         drawPoints();
         
