@@ -2,31 +2,44 @@
 #include <stdio.h>
 #include <vector>
 #include <iostream>
+#include <math.h>
 #include <glew.h>
 #include <GLFW/glfw3.h>
 
-/*
-План
- - двигать шарики
- - линии привязаны к шарикам
- - двигать шарики через cuda
- */
+#include <cuda_runtime.h>
+#include <cuda_gl_interop.h>
 
-// Function prototypes
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
+// Utilities and timing functions
+#include <helper_functions.h>    // includes cuda.h and cuda_runtime_api.h
+#include <timer.h>               // timing functions
 
-// Window dimensions
+// CUDA helper functions
+#include <helper_cuda.h>         // helper functions for CUDA error check
+#include <helper_cuda_gl.h>      // helper functions for CUDA/GL interop
+
+#include <vector_types.h>
+
+
+// vbo variables
+GLuint vbo;
+struct cudaGraphicsResource *cuda_vbo_resource;
+void *d_vbo_buffer = NULL;
+
 const GLuint WIDTH = 800, HEIGHT = 600;
 
 GLFWwindow* window;
 GLuint lineShaderProgram;
 GLuint pointShaderProgram;
 
-struct Point {
-    std::vector<float> pos;
-    std::vector<float> vel;
-} typedef Point;
-Point point;
+typedef struct Point {
+    float3 pos;
+    //std::vector<float> pos;
+    //std::vector<float> vel;
+};
+
+Point *point;
+
+Point *dptr = NULL;
 
 struct Line {
     std::vector<int> ft;
@@ -34,22 +47,55 @@ struct Line {
 } typedef Line;
 Line line;
 
+
+__device__ float3 operator+(const float3 &a, const float3 &b) {
+  return make_float3(a.x+b.x, a.y+b.y, a.z+b.z);
+
+}
+
+__global__ void simple_vbo_kernel(Point *point) {
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    //pos[i] = pos[i] + make_float3(0.001, 0.001, 0);
+    point[i].pos = point[i].pos + make_float3(0.001, 0.001, 0);
+}
+
+void launch_kernel(Point *pos) {
+    int p = 256;
+    int q = 1;
+    simple_vbo_kernel<<<1, 3 >>>(pos);
+}
+
+void createVBO(GLuint *vbo, cudaGraphicsResource **vbo_res, unsigned int vbo_res_flags, int size, void **dptr) {
+    cudaGraphicsMapResources(1, vbo_res, 0);
+    
+    size_t num_bytes;
+    checkCudaErrors(cudaGraphicsResourceGetMappedPointer(dptr, &num_bytes, *vbo_res));
+}
+
+void deleteVBO(cudaGraphicsResource **vbo_res) {
+    checkCudaErrors(cudaGraphicsUnmapResources(1, vbo_res, 0));
+}
+
+void runCuda(Point *dptr) {
+    launch_kernel(dptr);
+}
+
 // Is called whenever a key is pressed/released via GLFW
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode) {
     std::cout << key << std::endl;
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GL_TRUE);
     }
-    point.pos.push_back(0.4);
-    point.pos.push_back(0.4);
-    point.pos.push_back(0);
+    // point.pos.push_back(0.4);
+    // point.pos.push_back(0.4);
+    // point.pos.push_back(0);
 }
 
 int init() {
     std::cout << "Starting GLFW context, OpenGL 4.5" << std::endl;
-    // Init GLFW
+    
     glfwInit();
-    // Set all the required options for GLFW
+    
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -220,11 +266,12 @@ void drawPoints() {
     glUseProgram(pointShaderProgram);
     glPointSize(10.0);
     //glVertexPointer(2, GL_FLOAT, 0, pointVertex);
-    glDrawArrays(GL_POINTS, 0, point.pos.size() / 3);
+    
+    glDrawArrays(GL_POINTS, 0, (sizeof(Point) / sizeof(float)) / 3);
+    //glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 
-// The MAIN function, from here we start the application and run the game loop
 int main() {
     
     int res = init();
@@ -247,67 +294,52 @@ int main() {
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     
-    int pointsCount = 20;
-    int linesCount = 10;
-    
-    for (int i = 0; i < linesCount; i++) {
-        line.ft.push_back(rand() % pointsCount);
-        line.ft.push_back(rand() % pointsCount);
-    }
-    
-    //line.pos.reserve(line.ft.size() * 3);
-    for (uint i=0; i < line.ft.size() * 3; i++) line.pos.push_back(0);
-    //std::cout << "line.pos.size:" << line.pos.size() << std::endl;
-    
     srand(time(NULL));
     
-    for (int i = 0; i < pointsCount; i++) {
-        float a[3] = { (float)rand() / (float)RAND_MAX, (float)rand() / (float)RAND_MAX, 0 };
-        point.pos.insert(point.pos.end(), a, a + 3);
-        
-        float b[3] = { (float)rand() / (float)RAND_MAX / 100.0, (float)rand() / (float)RAND_MAX / 100.0, 0 };
-        point.vel.insert(point.vel.end(), b, b + 3);
-    }
+    point = (Point*)malloc(sizeof(Point));
+    point[0].pos = {0.1, 0.1, 0};
     
+    cudaGLSetGLDevice(gpuGetMaxGflopsDeviceId());
+    
+    cudaMalloc((void **) &dptr, sizeof(Point));
+    
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Point), 0, GL_DYNAMIC_DRAW);
+    checkCudaErrors(cudaGraphicsGLRegisterBuffer(&cuda_vbo_resource, VBO, cudaGraphicsMapFlagsWriteDiscard));
+    
+    createVBO(&VBO, &cuda_vbo_resource, cudaGraphicsMapFlagsWriteDiscard, sizeof(Point), (void **)&dptr);
+    cudaMemcpy((void *)&dptr, point, sizeof(Point), cudaMemcpyHostToDevice);
+    deleteVBO(&cuda_vbo_resource);
+    
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Point), point, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid *)0);
     
     int fpsCounter = 0;
     clock_t current_ticks, delta_ticks, fps = 0;
     while (!glfwWindowShouldClose(window)) {
         current_ticks = clock();
-        //std::cout << pos.size() << std::endl;
-        
-        for (uint i = 0; i < point.pos.size(); i++) {
-            point.pos[i] += point.vel[i];
-            if (point.pos[i] < -1 || point.pos[i] > 1) point.vel[i] *= -1;
-        }
-        
-        for (uint i = 0; i < line.ft.size(); i++) {
-            line.pos[i * 3    ] = point.pos[line.ft[i] * 3];
-            line.pos[i * 3 + 1] = point.pos[line.ft[i] * 3 + 1];
-            //line.pos[i * 3 + 2] = point.pos[line.ft[i] * 3 + 2];
-        }
-        
         glfwPollEvents();
-        
         glClearColor(0, 0, 0, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         
+        //glEnable(GL_DEPTH_TEST);
         glEnableClientState(GL_VERTEX_ARRAY);
         glEnableVertexAttribArray(0);
         
-        glBufferData(GL_ARRAY_BUFFER, line.pos.size() * sizeof(float), line.pos.data(), GL_DYNAMIC_DRAW);
-        drawLines();
+        //glBufferData(GL_ARRAY_BUFFER, line.pos.size() * sizeof(float), line.pos.data(), GL_DYNAMIC_DRAW);
+        //drawLines();
         
-        glBufferData(GL_ARRAY_BUFFER, point.pos.size() * sizeof(float), point.pos.data(), GL_DYNAMIC_DRAW);
+        //glBufferData(GL_ARRAY_BUFFER, point.pos.size() * sizeof(float), point.pos.data(), GL_DYNAMIC_DRAW);
         
         drawPoints();
-        
+        //glBindBuffer(GL_ARRAY_BUFFER, VBO);
         glDisableClientState(GL_VERTEX_ARRAY);
         glDisableVertexAttribArray(0);
         
-        // Swap the screen buffers
         glfwSwapBuffers(window);
+        
+        createVBO(&VBO, &cuda_vbo_resource, cudaGraphicsMapFlagsWriteDiscard, sizeof(Point), (void **)&dptr);
+        runCuda(dptr);
+        deleteVBO(&cuda_vbo_resource);
         
         // FPS
         delta_ticks = clock() - current_ticks;
@@ -326,6 +358,8 @@ int main() {
     // Properly de-allocate all resources once they've outlived their purpose
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
+    
+    cudaDeviceReset();
     
     // Terminate GLFW, clearing any resources allocated by GLFW.
     glfwTerminate();
