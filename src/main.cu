@@ -11,7 +11,6 @@
 
 // Utilities and timing functions
 #include <helper_functions.h>    // includes cuda.h and cuda_runtime_api.h
-#include <timer.h>               // timing functions
 
 // CUDA helper functions
 #include <helper_cuda.h>         // helper functions for CUDA error check
@@ -31,7 +30,7 @@ GLFWwindow* window;
 GLuint lineShaderProgram;
 GLuint pointShaderProgram;
 
-typedef struct Point {
+struct Point {
     float3 pos;
     //std::vector<float> pos;
     //std::vector<float> vel;
@@ -55,80 +54,32 @@ __device__ float3 operator+(const float3 &a, const float3 &b) {
 
 __global__ void simple_vbo_kernel(Point *point) {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
-    //pos[i] = pos[i] + make_float3(0.001, 0.001, 0);
     point[i].pos = point[i].pos + make_float3(0.001, 0.001, 0);
 }
 
 void launch_kernel(Point *pos) {
-    int p = 256;
-    int q = 1;
     simple_vbo_kernel<<<1, 3 >>>(pos);
 }
 
-void createVBO(GLuint *vbo, cudaGraphicsResource **vbo_res, unsigned int vbo_res_flags, int size, void **dptr) {
+void bindVBO(cudaGraphicsResource **vbo_res, void **dptr) {
     cudaGraphicsMapResources(1, vbo_res, 0);
     
     size_t num_bytes;
     checkCudaErrors(cudaGraphicsResourceGetMappedPointer(dptr, &num_bytes, *vbo_res));
 }
 
-void deleteVBO(cudaGraphicsResource **vbo_res) {
+void unbindVBO(cudaGraphicsResource **vbo_res) {
     checkCudaErrors(cudaGraphicsUnmapResources(1, vbo_res, 0));
 }
 
-void runCuda(Point *dptr) {
-    launch_kernel(dptr);
-}
 
-// Is called whenever a key is pressed/released via GLFW
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode) {
     std::cout << key << std::endl;
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GL_TRUE);
     }
-    // point.pos.push_back(0.4);
-    // point.pos.push_back(0.4);
-    // point.pos.push_back(0);
 }
 
-int init() {
-    std::cout << "Starting GLFW context, OpenGL 4.5" << std::endl;
-    
-    glfwInit();
-    
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
-
-    // Create a GLFWwindow object that we can use for GLFW's functions
-    window = glfwCreateWindow(WIDTH, HEIGHT, "LearnOpenGL", nullptr, nullptr);
-    if (window == nullptr) {
-        std::cout << "Failed to create GLFW window" << std::endl;
-        glfwTerminate();
-        return -1;
-    }
-    glfwMakeContextCurrent(window);
-    // Set the required callback functions
-    glfwSetKeyCallback(window, key_callback);
-
-    // Set this to true so GLEW knows to use a modern approach to retrieving function pointers and extensions
-    glewExperimental = GL_TRUE;
-    // Initialize GLEW to setup the OpenGL Function pointers
-    
-    GLenum glewinit = glewInit();
-    if (glewinit != GLEW_OK) {
-        std::cout << "Failed to initialize GLEW" << glewGetErrorString(glewinit) << std::endl;
-        return -1;
-    }
-
-    // Define the viewport dimensions
-    int width, height;
-    glfwGetFramebufferSize(window, &width, &height);
-    glViewport(0, 0, width, height);
-    
-    return 0;
-}
 
 GLuint getLineShaderProgram() {
     // Shaders
@@ -271,16 +222,76 @@ void drawPoints() {
     //glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-
-int main() {
+int init() {
+    std::cout << "Starting GLFW context, OpenGL 4.5" << std::endl;
     
-    int res = init();
-    if (res != 0) {
-        return 1;
+    glfwInit();
+    
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+    
+    // Create a GLFWwindow object that we can use for GLFW's functions
+    window = glfwCreateWindow(WIDTH, HEIGHT, "LearnOpenGL", nullptr, nullptr);
+    if (window == nullptr) {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
     }
+    glfwMakeContextCurrent(window);
+    // Set the required callback functions
+    glfwSetKeyCallback(window, key_callback);
+    
+    glewExperimental = GL_TRUE;
+    
+    GLenum glewinit = glewInit();
+    if (glewinit != GLEW_OK) {
+        std::cout << "Failed to initialize GLEW" << glewGetErrorString(glewinit) << std::endl;
+        return -1;
+    }
+    
+    int width, height;
+    glfwGetFramebufferSize(window, &width, &height);
+    glViewport(0, 0, width, height);
     
     lineShaderProgram = getLineShaderProgram();
     pointShaderProgram = getPointShaderProgram();
+    
+    return 0;
+}
+
+
+void loop() {
+    glfwPollEvents();
+    glClearColor(0, 0, 0, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    
+    //glEnable(GL_DEPTH_TEST);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableVertexAttribArray(0);
+    
+    //glBufferData(GL_ARRAY_BUFFER, line.pos.size() * sizeof(float), line.pos.data(), GL_DYNAMIC_DRAW);
+    //drawLines();
+    
+    //glBufferData(GL_ARRAY_BUFFER, point.pos.size() * sizeof(float), point.pos.data(), GL_DYNAMIC_DRAW);
+    
+    drawPoints();
+    //glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glDisableVertexAttribArray(0);
+    
+    glfwSwapBuffers(window);
+    
+    bindVBO(&cuda_vbo_resource, (void **)&dptr);
+    
+    launch_kernel(dptr);
+    unbindVBO(&cuda_vbo_resource);
+}
+
+
+int main() {
+    if (init() != 0) return 1;
     
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -294,8 +305,6 @@ int main() {
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     
-    srand(time(NULL));
-    
     point = (Point*)malloc(sizeof(Point));
     point[0].pos = {0.1, 0.1, 0};
     
@@ -306,62 +315,20 @@ int main() {
     glBufferData(GL_ARRAY_BUFFER, sizeof(Point), 0, GL_DYNAMIC_DRAW);
     checkCudaErrors(cudaGraphicsGLRegisterBuffer(&cuda_vbo_resource, VBO, cudaGraphicsMapFlagsWriteDiscard));
     
-    createVBO(&VBO, &cuda_vbo_resource, cudaGraphicsMapFlagsWriteDiscard, sizeof(Point), (void **)&dptr);
+    bindVBO(&cuda_vbo_resource, (void **)&dptr);
     cudaMemcpy((void *)&dptr, point, sizeof(Point), cudaMemcpyHostToDevice);
-    deleteVBO(&cuda_vbo_resource);
+    unbindVBO(&cuda_vbo_resource);
     
     glBufferData(GL_ARRAY_BUFFER, sizeof(Point), point, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid *)0);
     
-    int fpsCounter = 0;
-    clock_t current_ticks, delta_ticks, fps = 0;
-    while (!glfwWindowShouldClose(window)) {
-        current_ticks = clock();
-        glfwPollEvents();
-        glClearColor(0, 0, 0, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-        
-        //glEnable(GL_DEPTH_TEST);
-        glEnableClientState(GL_VERTEX_ARRAY);
-        glEnableVertexAttribArray(0);
-        
-        //glBufferData(GL_ARRAY_BUFFER, line.pos.size() * sizeof(float), line.pos.data(), GL_DYNAMIC_DRAW);
-        //drawLines();
-        
-        //glBufferData(GL_ARRAY_BUFFER, point.pos.size() * sizeof(float), point.pos.data(), GL_DYNAMIC_DRAW);
-        
-        drawPoints();
-        //glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glDisableClientState(GL_VERTEX_ARRAY);
-        glDisableVertexAttribArray(0);
-        
-        glfwSwapBuffers(window);
-        
-        createVBO(&VBO, &cuda_vbo_resource, cudaGraphicsMapFlagsWriteDiscard, sizeof(Point), (void **)&dptr);
-        runCuda(dptr);
-        deleteVBO(&cuda_vbo_resource);
-        
-        // FPS
-        delta_ticks = clock() - current_ticks;
-        if (delta_ticks > 0) {
-            fps = CLOCKS_PER_SEC / delta_ticks;
-        }
-        
-        if (fpsCounter % 100 == 0) {
-            std::cout << "fps: " << fps << std::endl;
-        }
-        
-        fpsCounter++;
-        if (fpsCounter > 1000000) fpsCounter = 0;
-    }
-
-    // Properly de-allocate all resources once they've outlived their purpose
+    while (!glfwWindowShouldClose(window)) loop();
+    
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
     
     cudaDeviceReset();
-    
-    // Terminate GLFW, clearing any resources allocated by GLFW.
     glfwTerminate();
+    
     return 0;
 }
