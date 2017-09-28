@@ -1,3 +1,12 @@
+//
+//  Полезные ссылки
+//    https://solarianprogrammer.com/2013/05/13/opengl-101-drawing-primitives/
+//    http://vbomesh.blogspot.ru/2012/02/vbo-opengl.html
+//    https://www.khronos.org/opengl/wiki/VBO_-_just_examples
+//    http://pmg.org.ru/nehe/
+//    http://www.codenet.ru/progr/opengl/
+
+
 // #define GLEW_STATIC
 #include <stdio.h>
 #include <vector>
@@ -18,10 +27,13 @@
 
 #include <vector_types.h>
 
-
 // vbo variables
-GLuint vbo;
+// GLuint VBO, VAO, VBO2;
+GLuint VBO, VAO, VBO2;
+GLuint VBOS[2];
+
 struct cudaGraphicsResource *cuda_vbo_resource;
+struct cudaGraphicsResource *cuda_vbo_resource2;
 void *d_vbo_buffer = NULL;
 
 const GLuint WIDTH = 800, HEIGHT = 600;
@@ -35,16 +47,24 @@ struct Point {
     //std::vector<float> pos;
     //std::vector<float> vel;
 };
-
 Point *point;
-
+int pointsCount = 3;
+int pointSize = sizeof(Point) * pointsCount;
 Point *dptr = NULL;
 
+struct pos2 {
+    float3 f;
+    float3 t;
+};
 struct Line {
-    std::vector<int> ft;
-    std::vector<float> pos;
+    //float pos[6];
+    pos2 pos;
 } typedef Line;
-Line line;
+Line *line;
+int linesCount = 1;
+int lineSize = sizeof(Line) * linesCount;
+Line *ldptr = NULL;
+
 
 
 __device__ float3 operator+(const float3 &a, const float3 &b) {
@@ -57,12 +77,13 @@ __global__ void simple_vbo_kernel(Point *point) {
     point[i].pos = point[i].pos + make_float3(0.001, 0.001, 0);
 }
 
-void launch_kernel(Point *pos) {
-    simple_vbo_kernel<<<1, 3 >>>(pos);
+void launch_kernel(Point *point) {
+    //int blocks = sizeof(&point) / pointSize;
+    simple_vbo_kernel<<<1, 9>>>(point);
 }
 
 void bindVBO(cudaGraphicsResource **vbo_res, void **dptr) {
-    cudaGraphicsMapResources(1, vbo_res, 0);
+    checkCudaErrors(cudaGraphicsMapResources(1, vbo_res, 0));
     
     size_t num_bytes;
     checkCudaErrors(cudaGraphicsResourceGetMappedPointer(dptr, &num_bytes, *vbo_res));
@@ -206,9 +227,9 @@ GLuint getPointShaderProgram() {
 void drawLines() {
     glEnable(GL_LINE_SMOOTH);
     glUseProgram(lineShaderProgram);
-    
+    //glVertexPointer(3, GL_FLOAT, 0, NULL);
     glLineWidth(2.0);
-    glDrawArrays(GL_LINES, 0, line.pos.size() / 3);
+    glDrawArrays(GL_LINES, 0, (lineSize / sizeof(float)) / 3);
     
     glDisable(GL_LINE_SMOOTH);
 }
@@ -216,10 +237,11 @@ void drawLines() {
 void drawPoints() {
     glUseProgram(pointShaderProgram);
     glPointSize(10.0);
-    //glVertexPointer(2, GL_FLOAT, 0, pointVertex);
+    glVertexPointer(3, GL_FLOAT, 0, NULL);
+    //glVertexPointer(3, GL_FLOAT, 0, dptr);
     
-    glDrawArrays(GL_POINTS, 0, (sizeof(Point) / sizeof(float)) / 3);
-    //glBindBuffer(GL_ARRAY_BUFFER, 0);
+    //glDrawArrays(GL_POINTS, 0, (pointSize / sizeof(float)) / 3);
+    glDrawArrays(GL_POINTS, 0, 3);
 }
 
 int init() {
@@ -239,8 +261,8 @@ int init() {
         glfwTerminate();
         return -1;
     }
+    
     glfwMakeContextCurrent(window);
-    // Set the required callback functions
     glfwSetKeyCallback(window, key_callback);
     
     glewExperimental = GL_TRUE;
@@ -269,22 +291,30 @@ void loop() {
     
     //glEnable(GL_DEPTH_TEST);
     glEnableClientState(GL_VERTEX_ARRAY);
+    
+    
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    //glVertexPointer(3, GL_FLOAT, 0, (GLvoid *)0);
     glEnableVertexAttribArray(0);
-    
-    //glBufferData(GL_ARRAY_BUFFER, line.pos.size() * sizeof(float), line.pos.data(), GL_DYNAMIC_DRAW);
-    //drawLines();
-    
-    //glBufferData(GL_ARRAY_BUFFER, point.pos.size() * sizeof(float), point.pos.data(), GL_DYNAMIC_DRAW);
-    
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid *)0);
     drawPoints();
-    //glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glDisableClientState(GL_VERTEX_ARRAY);
     glDisableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    
+    
+    glBindBuffer(GL_ARRAY_BUFFER, VBO2);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid *)0);
+    drawLines();
+    glDisableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    
+    //glDisable(GL_DEPTH_TEST);
+    glDisableClientState(GL_VERTEX_ARRAY);
     
     glfwSwapBuffers(window);
     
     bindVBO(&cuda_vbo_resource, (void **)&dptr);
-    
     launch_kernel(dptr);
     unbindVBO(&cuda_vbo_resource);
 }
@@ -299,33 +329,53 @@ int main() {
     glMatrixMode( GL_MODELVIEW );
     glLoadIdentity();
     
-    GLuint VBO, VAO;
     glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
     glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
     
-    point = (Point*)malloc(sizeof(Point));
+    point = (Point*)malloc(pointSize);
     point[0].pos = {0.1, 0.1, 0};
+    point[1].pos = {0, 0.1, 0};
+    point[2].pos = {0.1, 0, 0};
+    
+    line = (Line*)malloc(lineSize);
+    line[0].pos.f = {-0.5, 0, 0};
+    line[0].pos.t = {0, -0.5, 0};
     
     cudaGLSetGLDevice(gpuGetMaxGflopsDeviceId());
     
-    cudaMalloc((void **) &dptr, sizeof(Point));
+    glGenBuffers(2, VBOS);
+    VBO = VBOS[0];
+    VBO2 = VBOS[1];
     
-    glBufferData(GL_ARRAY_BUFFER, sizeof(Point), 0, GL_DYNAMIC_DRAW);
-    checkCudaErrors(cudaGraphicsGLRegisterBuffer(&cuda_vbo_resource, VBO, cudaGraphicsMapFlagsWriteDiscard));
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, pointSize, point, GL_DYNAMIC_DRAW);
+    // glBufferData(GL_ARRAY_BUFFER, pointSize, 0, GL_DYNAMIC_DRAW);
+    checkCudaErrors(cudaGraphicsGLRegisterBuffer(&cuda_vbo_resource, VBO, cudaGraphicsMapFlagsNone));
+    // bindVBO(&cuda_vbo_resource, (void **)&dptr);
+    // cudaMemcpy(dptr, point, pointSize, cudaMemcpyHostToDevice);
+    // unbindVBO(&cuda_vbo_resource);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
     
-    bindVBO(&cuda_vbo_resource, (void **)&dptr);
-    cudaMemcpy((void *)&dptr, point, sizeof(Point), cudaMemcpyHostToDevice);
-    unbindVBO(&cuda_vbo_resource);
     
-    glBufferData(GL_ARRAY_BUFFER, sizeof(Point), point, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid *)0);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO2);
+    glBufferData(GL_ARRAY_BUFFER, lineSize, line, GL_DYNAMIC_DRAW);
+    // glBufferData(GL_ARRAY_BUFFER, lineSize, 0, GL_DYNAMIC_DRAW);
+    checkCudaErrors(cudaGraphicsGLRegisterBuffer(&cuda_vbo_resource2, VBO2, cudaGraphicsMapFlagsNone));
+    // bindVBO(&cuda_vbo_resource2, (void **)&ldptr);
+    // cudaMemcpy(ldptr, line, lineSize, cudaMemcpyHostToDevice);
+    // unbindVBO(&cuda_vbo_resource2);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
     
     while (!glfwWindowShouldClose(window)) loop();
     
+    checkCudaErrors(cudaGraphicsUnregisterResource(cuda_vbo_resource));
+    checkCudaErrors(cudaGraphicsUnregisterResource(cuda_vbo_resource2));
+    
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
+    
+    cudaFree(dptr);
+    cudaFree(ldptr);
     
     cudaDeviceReset();
     glfwTerminate();
