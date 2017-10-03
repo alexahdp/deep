@@ -27,37 +27,27 @@
 
 #include <vector_types.h>
 
+#include "lineShader.hpp"
+//#include "pointShader.hpp"
+#include "point.cuh"
+
 // vbo variables
 // GLuint VBO, VAO, VBO2;
 GLuint VBO, VAO, VBO2;
 GLuint VBOS[2];
 
-struct cudaGraphicsResource *cuda_vbo_resource;
 struct cudaGraphicsResource *cuda_vbo_resource2;
-void *d_vbo_buffer = NULL;
 
 const GLuint WIDTH = 800, HEIGHT = 600;
 
 GLFWwindow* window;
 GLuint lineShaderProgram;
-GLuint pointShaderProgram;
-
-struct Point {
-    float3 pos;
-    //std::vector<float> pos;
-    //std::vector<float> vel;
-};
-Point *point;
-int pointsCount = 3;
-int pointSize = sizeof(Point) * pointsCount;
-Point *dptr = NULL;
 
 struct pos2 {
     float3 f;
     float3 t;
 };
 struct Line {
-    //float pos[6];
     pos2 pos;
 } typedef Line;
 Line *line;
@@ -67,33 +57,6 @@ Line *ldptr = NULL;
 
 
 
-__device__ float3 operator+(const float3 &a, const float3 &b) {
-  return make_float3(a.x+b.x, a.y+b.y, a.z+b.z);
-
-}
-
-__global__ void simple_vbo_kernel(Point *point) {
-    int i = blockDim.x * blockIdx.x + threadIdx.x;
-    point[i].pos = point[i].pos + make_float3(0.001, 0.001, 0);
-}
-
-void launch_kernel(Point *point) {
-    //int blocks = sizeof(&point) / pointSize;
-    simple_vbo_kernel<<<1, 9>>>(point);
-}
-
-void bindVBO(cudaGraphicsResource **vbo_res, void **dptr) {
-    checkCudaErrors(cudaGraphicsMapResources(1, vbo_res, 0));
-    
-    size_t num_bytes;
-    checkCudaErrors(cudaGraphicsResourceGetMappedPointer(dptr, &num_bytes, *vbo_res));
-}
-
-void unbindVBO(cudaGraphicsResource **vbo_res) {
-    checkCudaErrors(cudaGraphicsUnmapResources(1, vbo_res, 0));
-}
-
-
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode) {
     std::cout << key << std::endl;
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
@@ -101,128 +64,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     }
 }
 
-
-GLuint getLineShaderProgram() {
-    // Shaders
-    const GLchar* vertexShaderSource = "#version 450 core\n"
-        "in vec3 vertex_position;\n"
-        "void main(void) {\n"
-            "gl_Position = vec4(vertex_position, 1.0);\n"
-        "}\n\0";
-
-    const GLchar* fragmentShaderSource = "#version 450 core\n"
-        "void main(void) {\n"
-          "gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);\n"
-        "}\n\0";
-    
-    // Build and compile our shader program
-    // Vertex shader
-    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    
-    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-    glCompileShader(vertexShader);
-    
-    // Check for compile time errors
-    GLint success;
-    GLchar infoLog[512];
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    
-    if (!success) {
-        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
-    }
-    
-    // Fragment shader
-    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-    glCompileShader(fragmentShader);
-    // Check for compile time errors
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
-    }
-    
-    // Link shaders
-    GLuint shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-    
-    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-    if (!success) {
-        glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
-    }
-    
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-    
-    return shaderProgram;
-}
-
-GLuint getPointShaderProgram() {
-    // Shaders
-    const GLchar* vertexShaderSource = "#version 450 core\n"
-        "in vec3 vertex_position;\n"
-        "void main(void) {\n"
-            "gl_Position = vec4(vertex_position, 1.0);\n"
-            "gl_PointSize = 5.0;\n"
-        "}\n\0";
-
-    const GLchar* fragmentShaderSource = "#version 450 core\n"
-        "void main(void) {\n"
-        "  vec2 pos = gl_PointCoord.xy * vec2(2.0, -2.0) + vec2(-1.0, 1.0);\n"
-        "  float mag = dot(pos, pos);\n"
-          "if (mag > 1.0) discard;\n"
-          "gl_FragColor = vec4(1.0, .0, .0, 1.0);\n"
-        "}\n\0";
-    
-    // Build and compile our shader program
-    // Vertex shader
-    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    
-    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-    glCompileShader(vertexShader);
-    
-    // Check for compile time errors
-    GLint success;
-    GLchar infoLog[512];
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    
-    if (!success) {
-        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
-    }
-    
-    // Fragment shader
-    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-    glCompileShader(fragmentShader);
-    // Check for compile time errors
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
-    }
-    
-    // Link shaders
-    GLuint shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-    
-    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-    if (!success) {
-        glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
-    }
-    
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-    
-    return shaderProgram;
-}
 
 void drawLines() {
     glEnable(GL_LINE_SMOOTH);
@@ -234,15 +75,6 @@ void drawLines() {
     glDisable(GL_LINE_SMOOTH);
 }
 
-void drawPoints() {
-    glUseProgram(pointShaderProgram);
-    glPointSize(10.0);
-    glVertexPointer(3, GL_FLOAT, 0, NULL);
-    //glVertexPointer(3, GL_FLOAT, 0, dptr);
-    
-    //glDrawArrays(GL_POINTS, 0, (pointSize / sizeof(float)) / 3);
-    glDrawArrays(GL_POINTS, 0, 3);
-}
 
 int init() {
     std::cout << "Starting GLFW context, OpenGL 4.5" << std::endl;
@@ -278,13 +110,11 @@ int init() {
     glViewport(0, 0, width, height);
     
     lineShaderProgram = getLineShaderProgram();
-    pointShaderProgram = getPointShaderProgram();
     
     return 0;
 }
 
-
-void loop() {
+void loop(Ppoint* p1) {
     glfwPollEvents();
     glClearColor(0, 0, 0, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -293,11 +123,11 @@ void loop() {
     glEnableClientState(GL_VERTEX_ARRAY);
     
     
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, p1->VBO);
     //glVertexPointer(3, GL_FLOAT, 0, (GLvoid *)0);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid *)0);
-    drawPoints();
+    p1->draw();
     glDisableVertexAttribArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     
@@ -314,9 +144,10 @@ void loop() {
     
     glfwSwapBuffers(window);
     
-    bindVBO(&cuda_vbo_resource, (void **)&dptr);
-    launch_kernel(dptr);
-    unbindVBO(&cuda_vbo_resource);
+    p1->bindVBO();
+    p1->tick();
+    //launch_kernel(p1->dptr);
+    p1->unbindVBO();
 }
 
 
@@ -332,10 +163,7 @@ int main() {
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
     
-    point = (Point*)malloc(pointSize);
-    point[0].pos = {0.1, 0.1, 0};
-    point[1].pos = {0, 0.1, 0};
-    point[2].pos = {0.1, 0, 0};
+    Ppoint* p1 = new Ppoint(3);
     
     line = (Line*)malloc(lineSize);
     line[0].pos.f = {-0.5, 0, 0};
@@ -344,13 +172,13 @@ int main() {
     cudaGLSetGLDevice(gpuGetMaxGflopsDeviceId());
     
     glGenBuffers(2, VBOS);
-    VBO = VBOS[0];
+    p1->VBO = VBOS[0];
     VBO2 = VBOS[1];
     
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, pointSize, point, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, p1->VBO);
+    glBufferData(GL_ARRAY_BUFFER, p1->size, p1->data, GL_DYNAMIC_DRAW);
     // glBufferData(GL_ARRAY_BUFFER, pointSize, 0, GL_DYNAMIC_DRAW);
-    checkCudaErrors(cudaGraphicsGLRegisterBuffer(&cuda_vbo_resource, VBO, cudaGraphicsMapFlagsNone));
+    checkCudaErrors(cudaGraphicsGLRegisterBuffer(&p1->cuda_vbo_resource, p1->VBO, cudaGraphicsMapFlagsNone));
     // bindVBO(&cuda_vbo_resource, (void **)&dptr);
     // cudaMemcpy(dptr, point, pointSize, cudaMemcpyHostToDevice);
     // unbindVBO(&cuda_vbo_resource);
@@ -366,15 +194,16 @@ int main() {
     // unbindVBO(&cuda_vbo_resource2);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     
-    while (!glfwWindowShouldClose(window)) loop();
+    while (!glfwWindowShouldClose(window)) loop(p1);
     
-    checkCudaErrors(cudaGraphicsUnregisterResource(cuda_vbo_resource));
+    checkCudaErrors(cudaGraphicsUnregisterResource(p1->cuda_vbo_resource));
     checkCudaErrors(cudaGraphicsUnregisterResource(cuda_vbo_resource2));
     
     glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &p1->VBO);
+    glDeleteBuffers(1, &VBO2);
     
-    cudaFree(dptr);
+    cudaFree(p1->dptr);
     cudaFree(ldptr);
     
     cudaDeviceReset();
