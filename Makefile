@@ -8,6 +8,7 @@ BUILD_DIR=./build
 TARGET=bin/main
 OBJECTS=$(BUILD_DIR)/%.o
 MKDIR_P=mkdir -p
+NVCC_OPTS=-gencode arch=compute_35,code=sm_35
 
 bin/main: $(BUILD_DIR)/main.o $(BUILD_DIR)/lineShader.o $(BUILD_DIR)/pointShader.o $(BUILD_DIR)/point.o $(BUILD_DIR)/line.o
 	$(MKDIR_P) bin
@@ -21,18 +22,21 @@ $(BUILD_DIR)/main.o: $(SRC_DIR)/main.cu
 	@$(CC) \
 	-I /usr/include/GL -I /usr/local/include -I ./inc \
 	$(CFLAGS) -c $< -o $@
+	# $(NVCC_OPTS)
 
 $(BUILD_DIR)/point.o: $(SRC_DIR)/point.cu
 	$(MKDIR_P) build
 	@$(CC) \
 	-I /usr/include/GL -I /usr/local/include -I ./inc \
 	$(CFLAGS) -c $< -o $@
+	# $(NVCC_OPTS)
 
 $(BUILD_DIR)/line.o: $(SRC_DIR)/line.cu
 	$(MKDIR_P) build
 	@$(CC) \
 	-I /usr/include/GL -I /usr/local/include -I ./inc \
 	$(CFLAGS) -c $< -o $@
+	# $(NVCC_OPTS)
 
 $(BUILD_DIR)/lineShader.o: $(SRC_DIR)/lineShader.cpp
 	$(MKDIR_P) build

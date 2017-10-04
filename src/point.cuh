@@ -1,5 +1,6 @@
 struct PointStruct {
     float3 pos;
+    float3 vel;
 };
 
 class Point {

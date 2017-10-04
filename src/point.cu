@@ -6,62 +6,52 @@
 #include <cuda_gl_interop.h>
 
 #include <helper_cuda.h>
-// #include <helper_cuda_gl.h>
 
-#include <ctime>
-
+#include "point.cuh"
 #include "pointShader.hpp"
 
 
+int THREADS_PER_BLOCK = 1024;
 
-float randf() {
-    std::srand(unsigned(std::time(0)));
-    return (float)std::rand() / (float)RAND_MAX;
+float HALF_RAND_MAX = (float)RAND_MAX / 2.0;
+float trand() {
+    return (float)std::rand() / HALF_RAND_MAX - 1.0;
 }
-
-struct PointStruct {
-    float3 pos;
-};
 
 
 __device__ float3 operator+(const float3 &a, const float3 &b) {
-  return make_float3(a.x+b.x, a.y+b.y, a.z+b.z);
+  return make_float3(a.x + b.x, a.y + b.y, a.z + b.z);
 
 }
 
-__global__ void simple_vbo_kernel(PointStruct *point) {
+__global__ void simple_vbo_kernel(PointStruct *point, int n) {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
-    point[i].pos = point[i].pos + make_float3(0.001, 0.001, 0);
+    if (i > n) return;
+    point[i].pos = point[i].pos + point[i].vel;
 }
 
-
-class Point {
-    public:
-        int size;
-        int count;
-        GLuint pointShaderProgram;
-        GLuint VBO;
-        struct cudaGraphicsResource *cuda_vbo_resource;
-        PointStruct* data;
-        Point(int _count);
-        PointStruct *dptr;
-        
-        void bindVBO();
-        void unbindVBO();
-        void draw();
-        void tick();
-};
-
-//int Point::pointSize = sizeof(Point);
 
 Point::Point(int _count) {
     this->count = _count;
     this->size = sizeof(PointStruct) * _count;
     this->data = (PointStruct*)malloc(this->size);
     
-    this->data[0].pos = {randf(), 0.1, 0};
-    this->data[1].pos = {0, 0.1, 0};
-    this->data[2].pos = {0.1, 0, 0};
+    for (int i = 0; i < this->count; i++) {
+        this->data[i].pos = {trand(), trand(), 0};
+        this->data[i].vel = {trand() / 500.0f, trand() / 500.0f, 0};
+    }
+    
+    // this->data[0].pos = {0.5, 0, 0};
+    // this->data[0].vel = {0, 0.001, 0};
+    
+    // this->data[1].pos = {-0.75, 0, 0};
+    // this->data[1].vel = {0, -0.001, 0};
+    
+    // this->data[2].pos = {0, 0.5, 0};
+    // this->data[2].vel = {0.001, 0, 0};
+    
+    // this->data[3].pos = {0, -0.5, 0};
+    // this->data[3].vel = {-0.001, 0, 0};
     
     this->dptr = NULL;
     
@@ -82,14 +72,14 @@ void Point::unbindVBO() {
 void Point::draw() {
     glUseProgram(this->pointShaderProgram);
     glPointSize(10.0);
-    glVertexPointer(3, GL_FLOAT, 0, NULL);
-    //glVertexPointer(3, GL_FLOAT, 0, dptr);
     
-    //glDrawArrays(GL_POINTS, 0, (pointSize / sizeof(float)) / 3);
-    glDrawArrays(GL_POINTS, 0, 3);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(PointStruct), (GLvoid *)0);
+    glDrawArrays(GL_POINTS, 0, this->count);
 }
 
 void Point::tick() {
-    //int blocks = sizeof(&point) / pointSize;
-    simple_vbo_kernel<<<1, 9>>>(this->dptr);
+    int threads = this->count % THREADS_PER_BLOCK;
+    int blocks = (this->count + threads) / threads;
+    
+    simple_vbo_kernel<<<blocks, threads>>>(this->dptr, this->count);
 }

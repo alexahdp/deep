@@ -9,8 +9,6 @@
 
 // #define GLEW_STATIC
 #include <stdio.h>
-#include <vector>
-#include <iostream>
 #include <math.h>
 #include <glew.h>
 #include <GLFW/glfw3.h>
@@ -22,6 +20,8 @@
 
 #include <helper_cuda.h>         // helper functions for CUDA error check
 #include <helper_cuda_gl.h>      // helper functions for CUDA/GL interop
+
+#include <ctime>
 
 //#include "lineShader.hpp"
 //#include "pointShader.hpp"
@@ -92,18 +92,17 @@ void loop(Point* p1, Line* l1) {
     glBindBuffer(GL_ARRAY_BUFFER, p1->VBO);
     //glVertexPointer(3, GL_FLOAT, 0, (GLvoid *)0);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid *)0);
     p1->draw();
     glDisableVertexAttribArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     
     
-    glBindBuffer(GL_ARRAY_BUFFER, l1->VBO);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid *)0);
-    l1->draw();
-    glDisableVertexAttribArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    // glBindBuffer(GL_ARRAY_BUFFER, l1->VBO);
+    // glEnableVertexAttribArray(0);
+    // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid *)0);
+    // l1->draw();
+    // glDisableVertexAttribArray(0);
+    // glBindBuffer(GL_ARRAY_BUFFER, 0);
     
     //glDisable(GL_DEPTH_TEST);
     glDisableClientState(GL_VERTEX_ARRAY);
@@ -117,6 +116,9 @@ void loop(Point* p1, Line* l1) {
 
 
 int main() {
+    
+    std::srand(unsigned(std::time(0)));
+    
     if (init() != 0) return 1;
     
     glMatrixMode(GL_PROJECTION);
@@ -128,7 +130,7 @@ int main() {
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
     
-    Point* p1 = new Point(3);
+    Point* p1 = new Point(5000);
     Line* l1 = new Line(1);
     
     cudaGLSetGLDevice(gpuGetMaxGflopsDeviceId());
@@ -147,14 +149,14 @@ int main() {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     
     
-    glBindBuffer(GL_ARRAY_BUFFER, l1->VBO);
-    glBufferData(GL_ARRAY_BUFFER, l1->size, l1->data, GL_DYNAMIC_DRAW);
-    // glBufferData(GL_ARRAY_BUFFER, lineSize, 0, GL_DYNAMIC_DRAW);
-    checkCudaErrors(cudaGraphicsGLRegisterBuffer(&l1->cuda_vbo_resource, l1->VBO, cudaGraphicsMapFlagsNone));
-    // bindVBO(&cuda_vbo_resource2, (void **)&ldptr);
-    // cudaMemcpy(ldptr, line, lineSize, cudaMemcpyHostToDevice);
-    // unbindVBO(&cuda_vbo_resource2);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    // glBindBuffer(GL_ARRAY_BUFFER, l1->VBO);
+    // glBufferData(GL_ARRAY_BUFFER, l1->size, l1->data, GL_DYNAMIC_DRAW);
+    // // glBufferData(GL_ARRAY_BUFFER, lineSize, 0, GL_DYNAMIC_DRAW);
+    // checkCudaErrors(cudaGraphicsGLRegisterBuffer(&l1->cuda_vbo_resource, l1->VBO, cudaGraphicsMapFlagsNone));
+    // // bindVBO(&cuda_vbo_resource2, (void **)&ldptr);
+    // // cudaMemcpy(ldptr, line, lineSize, cudaMemcpyHostToDevice);
+    // // unbindVBO(&cuda_vbo_resource2);
+    // glBindBuffer(GL_ARRAY_BUFFER, 0);
     
     while (!glfwWindowShouldClose(window)) loop(p1, l1);
     
