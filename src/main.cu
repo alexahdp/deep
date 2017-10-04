@@ -18,43 +18,21 @@
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
 
-// Utilities and timing functions
 #include <helper_functions.h>    // includes cuda.h and cuda_runtime_api.h
 
-// CUDA helper functions
 #include <helper_cuda.h>         // helper functions for CUDA error check
 #include <helper_cuda_gl.h>      // helper functions for CUDA/GL interop
 
-#include <vector_types.h>
-
-#include "lineShader.hpp"
+//#include "lineShader.hpp"
 //#include "pointShader.hpp"
 #include "point.cuh"
+#include "line.cuh"
 
-// vbo variables
-// GLuint VBO, VAO, VBO2;
-GLuint VBO, VAO, VBO2;
+GLuint VAO;
 GLuint VBOS[2];
 
-struct cudaGraphicsResource *cuda_vbo_resource2;
-
 const GLuint WIDTH = 800, HEIGHT = 600;
-
 GLFWwindow* window;
-GLuint lineShaderProgram;
-
-struct pos2 {
-    float3 f;
-    float3 t;
-};
-struct Line {
-    pos2 pos;
-} typedef Line;
-Line *line;
-int linesCount = 1;
-int lineSize = sizeof(Line) * linesCount;
-Line *ldptr = NULL;
-
 
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode) {
@@ -62,17 +40,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GL_TRUE);
     }
-}
-
-
-void drawLines() {
-    glEnable(GL_LINE_SMOOTH);
-    glUseProgram(lineShaderProgram);
-    //glVertexPointer(3, GL_FLOAT, 0, NULL);
-    glLineWidth(2.0);
-    glDrawArrays(GL_LINES, 0, (lineSize / sizeof(float)) / 3);
-    
-    glDisable(GL_LINE_SMOOTH);
 }
 
 
@@ -109,12 +76,11 @@ int init() {
     glfwGetFramebufferSize(window, &width, &height);
     glViewport(0, 0, width, height);
     
-    lineShaderProgram = getLineShaderProgram();
-    
     return 0;
 }
 
-void loop(Ppoint* p1) {
+
+void loop(Ppoint* p1, Line* l1) {
     glfwPollEvents();
     glClearColor(0, 0, 0, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -132,10 +98,10 @@ void loop(Ppoint* p1) {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     
     
-    glBindBuffer(GL_ARRAY_BUFFER, VBO2);
+    glBindBuffer(GL_ARRAY_BUFFER, l1->VBO);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid *)0);
-    drawLines();
+    l1->draw();
     glDisableVertexAttribArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     
@@ -146,7 +112,6 @@ void loop(Ppoint* p1) {
     
     p1->bindVBO();
     p1->tick();
-    //launch_kernel(p1->dptr);
     p1->unbindVBO();
 }
 
@@ -164,16 +129,13 @@ int main() {
     glBindVertexArray(VAO);
     
     Ppoint* p1 = new Ppoint(3);
-    
-    line = (Line*)malloc(lineSize);
-    line[0].pos.f = {-0.5, 0, 0};
-    line[0].pos.t = {0, -0.5, 0};
+    Line* l1 = new Line(1);
     
     cudaGLSetGLDevice(gpuGetMaxGflopsDeviceId());
     
     glGenBuffers(2, VBOS);
     p1->VBO = VBOS[0];
-    VBO2 = VBOS[1];
+    l1->VBO = VBOS[1];
     
     glBindBuffer(GL_ARRAY_BUFFER, p1->VBO);
     glBufferData(GL_ARRAY_BUFFER, p1->size, p1->data, GL_DYNAMIC_DRAW);
@@ -185,26 +147,26 @@ int main() {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     
     
-    glBindBuffer(GL_ARRAY_BUFFER, VBO2);
-    glBufferData(GL_ARRAY_BUFFER, lineSize, line, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, l1->VBO);
+    glBufferData(GL_ARRAY_BUFFER, l1->size, l1->data, GL_DYNAMIC_DRAW);
     // glBufferData(GL_ARRAY_BUFFER, lineSize, 0, GL_DYNAMIC_DRAW);
-    checkCudaErrors(cudaGraphicsGLRegisterBuffer(&cuda_vbo_resource2, VBO2, cudaGraphicsMapFlagsNone));
+    checkCudaErrors(cudaGraphicsGLRegisterBuffer(&l1->cuda_vbo_resource, l1->VBO, cudaGraphicsMapFlagsNone));
     // bindVBO(&cuda_vbo_resource2, (void **)&ldptr);
     // cudaMemcpy(ldptr, line, lineSize, cudaMemcpyHostToDevice);
     // unbindVBO(&cuda_vbo_resource2);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     
-    while (!glfwWindowShouldClose(window)) loop(p1);
+    while (!glfwWindowShouldClose(window)) loop(p1, l1);
     
     checkCudaErrors(cudaGraphicsUnregisterResource(p1->cuda_vbo_resource));
-    checkCudaErrors(cudaGraphicsUnregisterResource(cuda_vbo_resource2));
+    checkCudaErrors(cudaGraphicsUnregisterResource(l1->cuda_vbo_resource));
     
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &p1->VBO);
-    glDeleteBuffers(1, &VBO2);
+    glDeleteBuffers(1, &l1->VBO);
     
     cudaFree(p1->dptr);
-    cudaFree(ldptr);
+    cudaFree(l1->dptr);
     
     cudaDeviceReset();
     glfwTerminate();

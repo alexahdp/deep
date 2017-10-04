@@ -9,10 +9,10 @@ TARGET=bin/main
 OBJECTS=$(BUILD_DIR)/%.o
 MKDIR_P=mkdir -p
 
-bin/main: $(BUILD_DIR)/main.o $(BUILD_DIR)/lineShader.o $(BUILD_DIR)/pointShader.o $(BUILD_DIR)/point.o
+bin/main: $(BUILD_DIR)/main.o $(BUILD_DIR)/lineShader.o $(BUILD_DIR)/pointShader.o $(BUILD_DIR)/point.o $(BUILD_DIR)/line.o
 	$(MKDIR_P) bin
 	$(CC) \
-	$(BUILD_DIR)/point.o $(BUILD_DIR)/main.o $(BUILD_DIR)/lineShader.o $(BUILD_DIR)/pointShader.o \
+	$(BUILD_DIR)/point.o $(BUILD_DIR)/line.o $(BUILD_DIR)/main.o $(BUILD_DIR)/lineShader.o $(BUILD_DIR)/pointShader.o \
 	$(CFLAGS) -o bin/main \
 	-lc -ldl -lglfw3 -lGLEW -lGLU -lGL -lXinerama -lXcursor -lX11 -lXrandr -lXi -lXxf86vm -lglut
 
@@ -23,6 +23,12 @@ $(BUILD_DIR)/main.o: $(SRC_DIR)/main.cu
 	$(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/point.o: $(SRC_DIR)/point.cu
+	$(MKDIR_P) build
+	@$(CC) \
+	-I /usr/include/GL -I /usr/local/include -I ./inc \
+	$(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/line.o: $(SRC_DIR)/line.cu
 	$(MKDIR_P) build
 	@$(CC) \
 	-I /usr/include/GL -I /usr/local/include -I ./inc \
