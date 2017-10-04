@@ -1,17 +1,17 @@
-struct Point {
+struct PointStruct {
     float3 pos;
 };
 
-class Ppoint {
+class Point {
     public:
         int size;
         int count;
         GLuint pointShaderProgram;
         GLuint VBO;
         struct cudaGraphicsResource *cuda_vbo_resource;
-        Point* data;
-        Ppoint(int _count);
-        Point *dptr;
+        PointStruct* data;
+        Point(int _count);
+        PointStruct *dptr;
         
         void bindVBO();
         void unbindVBO();

@@ -80,7 +80,7 @@ int init() {
 }
 
 
-void loop(Ppoint* p1, Line* l1) {
+void loop(Point* p1, Line* l1) {
     glfwPollEvents();
     glClearColor(0, 0, 0, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -128,7 +128,7 @@ int main() {
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
     
-    Ppoint* p1 = new Ppoint(3);
+    Point* p1 = new Point(3);
     Line* l1 = new Line(1);
     
     cudaGLSetGLDevice(gpuGetMaxGflopsDeviceId());

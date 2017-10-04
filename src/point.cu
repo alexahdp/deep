@@ -5,13 +5,21 @@
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
 
-#include <helper_cuda.h>         // helper functions for CUDA error check
-#include <helper_cuda_gl.h>      // helper functions for CUDA/GL interop
+#include <helper_cuda.h>
+// #include <helper_cuda_gl.h>
+
+#include <ctime>
 
 #include "pointShader.hpp"
-//#include "point.cuh"
 
-struct Point {
+
+
+float randf() {
+    std::srand(unsigned(std::time(0)));
+    return (float)std::rand() / (float)RAND_MAX;
+}
+
+struct PointStruct {
     float3 pos;
 };
 
@@ -21,22 +29,22 @@ __device__ float3 operator+(const float3 &a, const float3 &b) {
 
 }
 
-__global__ void simple_vbo_kernel(Point *point) {
+__global__ void simple_vbo_kernel(PointStruct *point) {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
     point[i].pos = point[i].pos + make_float3(0.001, 0.001, 0);
 }
 
 
-class Ppoint {
+class Point {
     public:
         int size;
         int count;
         GLuint pointShaderProgram;
         GLuint VBO;
         struct cudaGraphicsResource *cuda_vbo_resource;
-        Point* data;
-        Ppoint(int _count);
-        Point *dptr;
+        PointStruct* data;
+        Point(int _count);
+        PointStruct *dptr;
         
         void bindVBO();
         void unbindVBO();
@@ -44,14 +52,14 @@ class Ppoint {
         void tick();
 };
 
-//int Ppoint::pointSize = sizeof(Point);
+//int Point::pointSize = sizeof(Point);
 
-Ppoint::Ppoint(int _count) {
+Point::Point(int _count) {
     this->count = _count;
-    this->size = sizeof(Point) * _count;
-    this->data = (Point*)malloc(this->size);
+    this->size = sizeof(PointStruct) * _count;
+    this->data = (PointStruct*)malloc(this->size);
     
-    this->data[0].pos = {0.1, 0.1, 0};
+    this->data[0].pos = {randf(), 0.1, 0};
     this->data[1].pos = {0, 0.1, 0};
     this->data[2].pos = {0.1, 0, 0};
     
@@ -60,18 +68,18 @@ Ppoint::Ppoint(int _count) {
     this->pointShaderProgram = getPointShaderProgram();
 }
 
-void Ppoint::bindVBO() {
+void Point::bindVBO() {
     checkCudaErrors(cudaGraphicsMapResources(1, &this->cuda_vbo_resource, 0));
     
     size_t num_bytes;
     checkCudaErrors(cudaGraphicsResourceGetMappedPointer((void **)&this->dptr, &num_bytes, this->cuda_vbo_resource));
 }
 
-void Ppoint::unbindVBO() {
+void Point::unbindVBO() {
     checkCudaErrors(cudaGraphicsUnmapResources(1, &this->cuda_vbo_resource, 0));
 }
 
-void Ppoint::draw() {
+void Point::draw() {
     glUseProgram(this->pointShaderProgram);
     glPointSize(10.0);
     glVertexPointer(3, GL_FLOAT, 0, NULL);
@@ -81,7 +89,7 @@ void Ppoint::draw() {
     glDrawArrays(GL_POINTS, 0, 3);
 }
 
-void Ppoint::tick() {
+void Point::tick() {
     //int blocks = sizeof(&point) / pointSize;
     simple_vbo_kernel<<<1, 9>>>(this->dptr);
 }
