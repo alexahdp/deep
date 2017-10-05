@@ -5,7 +5,8 @@ struct PointStruct {
 
 class Point {
     public:
-        int size;
+        int COUNT;
+        int SIZE;
         int count;
         GLuint pointShaderProgram;
         GLuint VBO;
@@ -14,8 +15,12 @@ class Point {
         Point(int _count);
         PointStruct *dptr;
         
+        int size();
         void bindVBO();
         void unbindVBO();
         void draw();
         void tick();
+        void add(float3 pos, float3 vel);
+        void d2h();
+        void h2d();
 };

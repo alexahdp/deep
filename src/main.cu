@@ -27,6 +27,7 @@
 //#include "pointShader.hpp"
 #include "point.cuh"
 #include "line.cuh"
+#include "lib.hpp"
 
 GLuint VAO;
 GLuint VBOS[2];
@@ -34,10 +35,23 @@ GLuint VBOS[2];
 const GLuint WIDTH = 800, HEIGHT = 600;
 GLFWwindow* window;
 
+Point* p1;
+Line* l1;
+
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode) {
-    std::cout << key << std::endl;
+    
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GL_TRUE);
+    }
+    
+    std::cout << key << std::endl;
+    std::cout << "===" << std::endl;
+    
+    if (action == GLFW_PRESS) {
+        float3 pos = {trand(), trand(), 0};
+        float3 vel = {trand(), trand(), 0};
+        
+        p1->add(pos, vel);
     }
 }
 
@@ -131,8 +145,8 @@ int main() {
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
     
-    Point* p1 = new Point(10);
-    Line* l1 = new Line(10);
+    p1 = new Point(2);
+    l1 = new Line(1);
     
     cudaGLSetGLDevice(gpuGetMaxGflopsDeviceId());
     
@@ -141,7 +155,7 @@ int main() {
     l1->VBO = VBOS[1];
     
     glBindBuffer(GL_ARRAY_BUFFER, p1->VBO);
-    glBufferData(GL_ARRAY_BUFFER, p1->size, p1->data, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, p1->SIZE, p1->data, GL_DYNAMIC_DRAW);
     checkCudaErrors(cudaGraphicsGLRegisterBuffer(&p1->cuda_vbo_resource, p1->VBO, cudaGraphicsMapFlagsNone));
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     
