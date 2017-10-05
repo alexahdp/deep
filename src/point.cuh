@@ -1,9 +1,11 @@
+#include "element.cuh"
+
 struct PointStruct {
     float3 pos;
     float3 vel;
 };
 
-class Point {
+class Point : Element {
     public:
         int COUNT;
         int SIZE;
@@ -16,8 +18,6 @@ class Point {
         PointStruct *dptr;
         
         int size();
-        void bindVBO();
-        void unbindVBO();
         void draw();
         void tick();
         void add(float3 pos, float3 vel);

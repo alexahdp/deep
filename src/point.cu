@@ -21,7 +21,7 @@ __global__ void simple_vbo_kernel(PointStruct *point, int n) {
 
 int PointStructSize = (int)sizeof(PointStruct);
 
-Point::Point(int _count) {
+Point::Point(int _count){
     this->COUNT = 10000;
     this->SIZE = PointStructSize * COUNT;
     
@@ -52,6 +52,7 @@ void Point::add(float3 pos, float3 vel) {
     this->h2d();
 }
 
+
 void Point::d2h() {
     this->bindVBO();
     
@@ -63,17 +64,6 @@ void Point::h2d() {
     this->bindVBO();
     checkCudaErrors(cudaMemcpy(this->dptr, (void *)this->data, this->size(), cudaMemcpyHostToDevice));
     this->unbindVBO();
-}
-
-void Point::bindVBO() {
-    checkCudaErrors(cudaGraphicsMapResources(1, &this->cuda_vbo_resource, 0));
-    
-    size_t num_bytes;
-    checkCudaErrors(cudaGraphicsResourceGetMappedPointer((void **)&this->dptr, &num_bytes, this->cuda_vbo_resource));
-}
-
-void Point::unbindVBO() {
-    checkCudaErrors(cudaGraphicsUnmapResources(1, &this->cuda_vbo_resource, 0));
 }
 
 void Point::draw() {
