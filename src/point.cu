@@ -6,23 +6,12 @@
 #include <cuda_gl_interop.h>
 
 #include <helper_cuda.h>
+#include <helper_math.h>
 
 #include "point.cuh"
 #include "pointShader.hpp"
+#include "lib.hpp"
 
-
-int THREADS_PER_BLOCK = 1024;
-
-float HALF_RAND_MAX = (float)RAND_MAX / 2.0;
-float trand() {
-    return (float)std::rand() / HALF_RAND_MAX - 1.0;
-}
-
-
-__device__ float3 operator+(const float3 &a, const float3 &b) {
-  return make_float3(a.x + b.x, a.y + b.y, a.z + b.z);
-
-}
 
 __global__ void simple_vbo_kernel(PointStruct *point, int n) {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
@@ -78,6 +67,8 @@ void Point::draw() {
 }
 
 void Point::tick() {
+    int THREADS_PER_BLOCK = 1024;
+    
     int threads = this->count % THREADS_PER_BLOCK;
     int blocks = (this->count + threads) / threads;
     

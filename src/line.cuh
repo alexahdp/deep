@@ -20,5 +20,5 @@ class Line {
         void bindVBO();
         void unbindVBO();
         void draw();
-        //void tick();
+        void tick();
 };

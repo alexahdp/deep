@@ -8,12 +8,13 @@ BUILD_DIR=./build
 TARGET=bin/main
 OBJECTS=$(BUILD_DIR)/%.o
 MKDIR_P=mkdir -p
-NVCC_OPTS=-gencode arch=compute_35,code=sm_35
+# NVCC_OPTS=-gencode arch=compute_35,code=sm_35
+NVCC_OPTS=
 
-bin/main: $(BUILD_DIR)/main.o $(BUILD_DIR)/lineShader.o $(BUILD_DIR)/pointShader.o $(BUILD_DIR)/point.o $(BUILD_DIR)/line.o
+bin/main: $(BUILD_DIR)/main.o $(BUILD_DIR)/lineShader.o $(BUILD_DIR)/pointShader.o $(BUILD_DIR)/point.o $(BUILD_DIR)/line.o $(BUILD_DIR)/lib.o
 	$(MKDIR_P) bin
 	$(CC) \
-	$(BUILD_DIR)/point.o $(BUILD_DIR)/line.o $(BUILD_DIR)/main.o $(BUILD_DIR)/lineShader.o $(BUILD_DIR)/pointShader.o \
+	$(BUILD_DIR)/point.o $(BUILD_DIR)/line.o $(BUILD_DIR)/main.o $(BUILD_DIR)/lineShader.o $(BUILD_DIR)/pointShader.o $(BUILD_DIR)/lib.o \
 	$(CFLAGS) -o bin/main \
 	-lc -ldl -lglfw3 -lGLEW -lGLU -lGL -lXinerama -lXcursor -lX11 -lXrandr -lXi -lXxf86vm -lglut
 
@@ -45,6 +46,12 @@ $(BUILD_DIR)/lineShader.o: $(SRC_DIR)/lineShader.cpp
 	$(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/pointShader.o: $(SRC_DIR)/pointShader.cpp
+	$(MKDIR_P) build
+	g++ \
+	-I /usr/include/GL -I /usr/local/include -I ./inc \
+	$(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/lib.o: $(SRC_DIR)/lib.cpp
 	$(MKDIR_P) build
 	g++ \
 	-I /usr/include/GL -I /usr/local/include -I ./inc \
