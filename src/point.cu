@@ -52,6 +52,16 @@ void Point::add(float3 pos, float3 vel) {
     this->h2d();
 }
 
+void Point::bindVBO() {
+    checkCudaErrors(cudaGraphicsMapResources(1, &this->cuda_vbo_resource, 0));
+    
+    size_t num_bytes;
+    checkCudaErrors(cudaGraphicsResourceGetMappedPointer((void **)&this->dptr, &num_bytes, this->cuda_vbo_resource));
+}
+
+void Point::unbindVBO() {
+    checkCudaErrors(cudaGraphicsUnmapResources(1, &this->cuda_vbo_resource, 0));
+}
 
 void Point::d2h() {
     this->bindVBO();

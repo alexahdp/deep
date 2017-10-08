@@ -120,9 +120,9 @@ void loop(Point* p1, Line* l1) {
     
     glfwSwapBuffers(window);
     
-    // p1->bindVBO();
-    // p1->tick();
-    // p1->unbindVBO();
+    p1->bindVBO();
+    p1->tick();
+    p1->unbindVBO();
     
     l1->bindVBO();
     l1->tick();
