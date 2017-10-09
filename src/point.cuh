@@ -1,3 +1,6 @@
+#ifndef POINT_CUH
+#define POINT_CUH
+
 struct PointStruct {
     float3 pos;
     float3 vel;
@@ -24,3 +27,5 @@ class Point {
         void d2h();
         void h2d();
 };
+
+#endif

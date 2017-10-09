@@ -34,9 +34,16 @@ Point::Point(int _count){
         this->data[i].vel = {trand() / 500.0f, trand() / 500.0f, 0};
     }
     
+    glGenBuffers(1, &this->VBO);
+    
     this->dptr = NULL;
     
     this->pointShaderProgram = getPointShaderProgram();
+    
+    glBindBuffer(GL_ARRAY_BUFFER, this->VBO);
+    glBufferData(GL_ARRAY_BUFFER, this->SIZE, this->data, GL_DYNAMIC_DRAW);
+    checkCudaErrors(cudaGraphicsGLRegisterBuffer(&this->cuda_vbo_resource, this->VBO, cudaGraphicsMapFlagsNone));
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 int Point::size() {

@@ -9,6 +9,7 @@
 
 // #define GLEW_STATIC
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include <glew.h>
 #include <GLFW/glfw3.h>
@@ -125,7 +126,9 @@ void loop(Point* p1, Line* l1) {
     p1->unbindVBO();
     
     l1->bindVBO();
-    l1->tick();
+    //std::cout << p1->dptr[0].pos << std::endl;
+    //printf("pos: %f \n", p1->dptr[0].pos.x);
+    l1->tick(p1);
     l1->unbindVBO();
 }
 
@@ -149,20 +152,6 @@ int main() {
     l1 = new Line(1);
     
     cudaGLSetGLDevice(gpuGetMaxGflopsDeviceId());
-    
-    glGenBuffers(2, VBOS);
-    p1->VBO = VBOS[0];
-    l1->VBO = VBOS[1];
-    
-    glBindBuffer(GL_ARRAY_BUFFER, p1->VBO);
-    glBufferData(GL_ARRAY_BUFFER, p1->SIZE, p1->data, GL_DYNAMIC_DRAW);
-    checkCudaErrors(cudaGraphicsGLRegisterBuffer(&p1->cuda_vbo_resource, p1->VBO, cudaGraphicsMapFlagsNone));
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    
-    glBindBuffer(GL_ARRAY_BUFFER, l1->VBO);
-    glBufferData(GL_ARRAY_BUFFER, l1->size, l1->data, GL_DYNAMIC_DRAW);
-    checkCudaErrors(cudaGraphicsGLRegisterBuffer(&l1->cuda_vbo_resource, l1->VBO, cudaGraphicsMapFlagsNone));
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
     
     while (!glfwWindowShouldClose(window)) loop(p1, l1);
     
